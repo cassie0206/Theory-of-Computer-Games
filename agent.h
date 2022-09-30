@@ -215,7 +215,6 @@ class greedy_slider : public random_agent
 {
 public:
 	greedy_slider(const std::string &args = "") : random_agent("name=greedy_slider role=slider " + args) {}
-
 	virtual action take_action(const board &before)
 	{
 		board::reward maxReward = INT_MIN;
@@ -233,6 +232,44 @@ public:
 		}
 
 		return action();
-
 	}
 };
+
+/**
+ * two step greedy player, i.e., slider
+ * select a legal action by greedy alg.
+ */
+class two_step_greedy_slider : public random_agent
+{
+public:
+	two_step_greedy_slider(const std::string &args = "") : random_agent("name=two_step_greedy_slider role=slider " + args) {}
+
+	virtual action take_action(const board &before)
+	{
+		board::reward maxFirstReward = INT_MIN;
+		int index = 0;
+
+		for(int i = 0; i < 4; i++){
+			board board1 = board(before);
+			board::reward FirstReward = board1.slide(i);
+			board::reward maxSecondReward = INT_MIN;	
+
+			for(int j = 0; j < 4; j++){
+				board board2 = board(board1);
+				maxSecondReward = max(maxSecondReward, board2.slide(j));
+			}
+
+			if(maxSecondReward + FirstReward > maxFirstReward){
+				maxFirstReward = maxSecondReward + FirstReward;
+				index = i;
+			}
+		}
+		if(maxFirstReward != -1) {
+			return action::slide(index);
+		}
+
+		return action();
+	}
+};
+
+
