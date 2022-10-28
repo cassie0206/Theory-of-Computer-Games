@@ -226,7 +226,6 @@ public:
 		if (meta.find("load") != meta.end())
 			load_weights(meta["load"]);
 
-		//alpha = 0.003125;
 		count = 0;
 	}
 	virtual ~TDL_slider()
@@ -322,7 +321,5 @@ public:
 	}
 
 private:
-	std::vector<weight> net;
-	float alpha;
 	int count;
 };

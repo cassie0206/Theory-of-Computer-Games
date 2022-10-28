@@ -84,11 +84,11 @@ int main(int argc, const char* argv[]) {
 			agent& who = game.take_turns(slide, place);
 			action move = who.take_action(game.state(), s);
 //			std::cerr << game.state() << "#" << game.step() << " " << who.name() << ": " << move << std::endl;
+			if (game.apply_action(move) != true) break;
+			s.after =game.state();
 			if(s.isSlider){
 				vs.push(s);
 			}
-
-			if (game.apply_action(move) != true) break;
 			if (who.check_for_win(game.state())) break;
 		}
 		slide.update_value(vs);
