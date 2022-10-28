@@ -95,18 +95,18 @@ class weight_agent : public agent
 public:
 	weight_agent(const std::string &args = "") : agent(args), alpha(0)
 	{
-		if (meta.find("init") != meta.end())
+		/*if (meta.find("init") != meta.end())
 			init_weights(meta["init"]);
 		if (meta.find("load") != meta.end())
-			load_weights(meta["load"]);
+			load_weights(meta["load"]);*/
 		if (meta.find("alpha") != meta.end())
 			alpha = float(meta["alpha"]);
 	}
-	virtual ~weight_agent()
+	/*virtual ~weight_agent()
 	{
 		if (meta.find("save") != meta.end())
 			save_weights(meta["save"]);
-	}
+	}*/
 
 protected:
 	virtual void init_weights(const std::string &info)
@@ -118,9 +118,6 @@ protected:
 		std::stringstream in(res);
 		for (size_t size; in >> size; net.emplace_back(size))
 			;*/
-		for(int i=0;i<4;i++){
-			net.emplace_back(weight(16 * 16 * 16 * 16 * 16 * 16));
-		}
 	}
 	virtual void load_weights(const std::string &path)
 	{
@@ -288,8 +285,19 @@ public:
 class TDL_slider : public weight_agent{
 public:
 	TDL_slider(const std::string &args = "") : weight_agent("name=TDL_slider role=slider " + args) {
+		for(int i=0;i<4;i++){
+			net.emplace_back(weight(16 * 16 * 16 * 16 * 16 * 16));
+		}
+		if (meta.find("load") != meta.end())
+			load_weights(meta["load"]);
+
 		alpha = 0.003125;
 		count = 0;
+	}
+	virtual ~TDL_slider()
+	{
+		if (meta.find("save") != meta.end())
+			save_weights(meta["save"]);
 	}
 												 
 	virtual action take_action(const board &before, state &s)
