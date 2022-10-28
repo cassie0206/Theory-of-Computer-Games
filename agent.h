@@ -121,7 +121,7 @@ protected:
 
 		string res = info;
 		for(int i=0;i<4;i++){
-			net.emplace_back(weight(stoi(res)));
+			net.emplace_back(weight(stoi(res) * stoi(res) * stoi(res) * stoi(res) * stoi(res) * stoi(res)));
 		}
 	}
 	virtual void load_weights(const std::string &path)
