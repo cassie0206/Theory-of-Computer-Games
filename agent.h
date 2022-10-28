@@ -286,9 +286,6 @@ public:
 class TDL_slider : public weight_agent{
 public:
 	TDL_slider(const std::string &args = "") : weight_agent("name=TDL_slider role=slider " + args) {
-		for(int i=0;i<4;i++){
-			net.emplace_back(weight(16 * 16 * 16 * 16 * 16 * 16));
-		}
 		alpha = 0.003125;
 		count = 0;
 	}
