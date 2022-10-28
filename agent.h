@@ -217,7 +217,8 @@ private:
 	std::array<int, 4> opcode;
 };
 
-class TDL_slider : public weight_agent{
+class TDL_slider : public weight_agent
+{
 public:
 	TDL_slider(const std::string &args = "") : weight_agent("name=TDL_slider role=slider " + args) {
 		for(int i=0;i<4;i++){
@@ -239,7 +240,7 @@ public:
 		s.isSlider = true;
 		float best_value = -numeric_limits<float>::max();
 		float best_cur_val = -numeric_limits<float>::max();
-		int best_reward = INT_MIN;
+		int best_reward = -1;
 		int best_op = -1; 
 		for(int i=0;i<4;i++){
 			board tmp = board(before);
@@ -257,13 +258,13 @@ public:
 			}
 		}
 
-		if(best_op == -1){
-			return action();
-		}
-		else{
-			return action::slide(best_op);
+		if(best_op != -1 && best_reward != -1){
 			s.reward = best_reward;
 			s.value = best_cur_val;
+			return action::slide(best_op);
+		}
+		else{
+			return action();
 		}
 	}
 
@@ -285,12 +286,8 @@ public:
 		return val;
 	}
 
-	int encode4(const board& board, int a, int b, int c, int d){
-		return board(a) + board(b) * 16 + board(c) * 16 * 16 + board(d) * 16 * 16 * 16;
-	}
-
 	int encode6(const board& board, int a, int b, int c, int d, int e, int f){
-		return board(a) + board(b) * 16 + board(c) * 16 * 16 + board(d) * 16 * 16 * 16 + board(e) * 16 * 16 * 16 * 16 + board(f) * 16 * 16 * 16 * 16 * 16;
+		return (board(a) << 0) | (board(b) << 4) | (board(c) << 8) | (board(d) << 12) | (board(e) << 16) | (board(f) << 20);
 	}
 
 	void adjust_weight(const board& b, float target){
@@ -310,7 +307,7 @@ public:
 	}
 
 	void update_value(stack<state> &s){
-		int cur_val = 0;
+		float cur_val = 0;
 		while(!s.empty()){
 			state cur = s.top();
 			s.pop();
