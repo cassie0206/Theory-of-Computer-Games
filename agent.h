@@ -118,10 +118,8 @@ protected:
 		std::stringstream in(res);
 		for (size_t size; in >> size; net.emplace_back(size))
 			;*/
-
-		string res = info;
 		for(int i=0;i<4;i++){
-			net.emplace_back(weight(stoi(res) * stoi(res) * stoi(res) * stoi(res) * stoi(res) * stoi(res)));
+			net.emplace_back(weight(16 * 16 * 16 * 16 * 16 * 16));
 		}
 	}
 	virtual void load_weights(const std::string &path)
