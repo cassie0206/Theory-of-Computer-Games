@@ -286,12 +286,8 @@ public:
 class TDL_slider : public weight_agent{
 public:
 	TDL_slider(const std::string &args = "") : weight_agent("name=TDL_slider role=slider " + args) {
-		net.emplace_back(weight(15 * 15 * 15 * 15 * 15 * 15));
-		net.emplace_back(weight(15 * 15 * 15 * 15 * 15 * 15));
-		net.emplace_back(weight(15 * 15 * 15 * 15));
-		net.emplace_back(weight(15 * 15 * 15 * 15));
 		for(int i=0;i<4;i++){
-			net.emplace_back(weight(15 * 15 * 15 * 15 * 15 * 15));
+			net.emplace_back(weight(16 * 16 * 16 * 16 * 16 * 16));
 		}
 		alpha = 0.003125;
 		count = 0;
@@ -334,15 +330,16 @@ public:
 		// isomorphism * 8 (rotate + reflect)
 		for(int i=0;i<2;i++){
 			for(int j=0;j<4;j++){
-				val += net[0][encode6(tmp, 0, 4, 8, 1, 5, 9)];
-				val += net[0][encode6(tmp, 1, 5, 9, 2, 6, 10)];
-				val += net[0][encode4(tmp, 2, 6, 10, 14)];
-				val += net[0][encode4(tmp, 3, 7, 11, 15)];
+				val += net[0][encode6(tmp, 0, 1, 2, 3, 4, 5)];
+				val += net[0][encode6(tmp, 4, 5, 6, 7, 8, 9)];
+				val += net[0][encode6(tmp, 5, 6, 7, 9, 10, 11)];
+				val += net[0][encode6(tmp, 9, 10, 11, 13, 14, 15)];
 
 				tmp.rotate_clockwise();
 			}
 			tmp.reflect_horizontal();
 		}
+		return val;
 	}
 
 	int encode4(const board& board, int a, int b, int c, int d){
@@ -359,10 +356,10 @@ public:
 
 		for(int i=0;i<2;i++){
 			for(int j=0;j<4;j++){
-				net[0][encode6(tmp, 0, 4, 8, 1, 5, 9)] += target;
-				net[0][encode6(tmp, 1, 5, 9, 2, 6, 10)] += target;
-				net[0][encode4(tmp, 2, 6, 10, 14)] += target;
-				net[0][encode4(tmp, 3, 7, 11, 15)] += target;
+				net[0][encode6(tmp, 0, 1, 2, 3, 4, 5)] += target;
+				net[0][encode6(tmp, 4, 5, 6, 7, 8, 9)] += target;
+				net[0][encode6(tmp, 5, 6, 7, 9, 10, 11)] += target;
+				net[0][encode6(tmp, 9, 10, 11, 13, 14, 15)] += target;
 
 				tmp.rotate_clockwise();
 			}
