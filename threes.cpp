@@ -11,6 +11,7 @@
 #include <fstream>
 #include <iterator>
 #include <string>
+#include <stack>
 #include "board.h"
 #include "action.h"
 #include "agent.h"
@@ -64,9 +65,11 @@ int main(int argc, const char* argv[]) {
 	}
 
 	//random_slider slide(slide_args);
-	two_step_greedy_slider slide(slide_args);
+	//two_step_greedy_slider slide(slide_args);
 	//greedy_slider slide(slide_args);
+	TDL_slider slide(slide_args);
 	random_placer place(place_args);
+	stack<state> vs;
 
 	while (!stats.is_finished()) {
 //		std::cerr << "======== Game " << stats.step() << " ========" << std::endl;
@@ -76,12 +79,20 @@ int main(int argc, const char* argv[]) {
 		stats.open_episode(slide.name() + ":" + place.name());
 		episode& game = stats.back();
 		while (true) {
+			state s;
+			s.before = game.state();
 			agent& who = game.take_turns(slide, place);
-			action move = who.take_action(game.state());
+			action move = who.take_action(game.state(), s);
 //			std::cerr << game.state() << "#" << game.step() << " " << who.name() << ": " << move << std::endl;
+			if(s.isSlider){
+				vs.push(s);
+			}
+
 			if (game.apply_action(move) != true) break;
 			if (who.check_for_win(game.state())) break;
 		}
+		slide.update_value(vs);
+
 		agent& win = game.last_turns(slide, place);
 		stats.close_episode(win.name());
 

@@ -17,11 +17,21 @@
 #include <algorithm>
 #include <fstream>
 #include <climits>
+#include <limits>
+#include <stack>
 #include "board.h"
 #include "action.h"
 #include "weight.h"
 
 using namespace std;
+
+struct state{
+	board before;
+	board after;
+	float value = 0.0;
+	int reward = 0;
+	bool isSlider = false;
+};
 
 class agent
 {
@@ -39,7 +49,7 @@ public:
 	virtual ~agent() {}
 	virtual void open_episode(const std::string &flag = "") {}
 	virtual void close_episode(const std::string &flag = "") {}
-	virtual action take_action(const board &b) { return action(); }
+	virtual action take_action(const board &b, state &s) { return action(); }
 	virtual bool check_for_win(const board &b) { return false; }
 
 public:
@@ -108,6 +118,7 @@ protected:
 		std::stringstream in(res);
 		for (size_t size; in >> size; net.emplace_back(size))
 			;
+
 	}
 	virtual void load_weights(const std::string &path)
 	{
@@ -154,7 +165,7 @@ public:
 		spaces[4] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15}; // all
 	}
 
-	virtual action take_action(const board &after)
+	virtual action take_action(const board &after, state &s)
 	{
 		std::vector<int> space = spaces[after.last()];
 		std::shuffle(space.begin(), space.end(), engine);
@@ -191,7 +202,7 @@ public:
 	random_slider(const std::string &args = "") : random_agent("name=slide role=slider " + args),
 												  opcode({0, 1, 2, 3}) {}
 
-	virtual action take_action(const board &before)
+	virtual action take_action(const board &before, state &s)
 	{
 		std::shuffle(opcode.begin(), opcode.end(), engine);
 		for (int op : opcode)
@@ -215,7 +226,7 @@ class greedy_slider : public random_agent
 {
 public:
 	greedy_slider(const std::string &args = "") : random_agent("name=greedy_slider role=slider " + args) {}
-	virtual action take_action(const board &before)
+	virtual action take_action(const board &before, state &s)
 	{
 		board::reward maxReward = INT_MIN;
 		int index = 0;
@@ -244,7 +255,7 @@ class two_step_greedy_slider : public random_agent
 public:
 	two_step_greedy_slider(const std::string &args = "") : random_agent("name=two_step_greedy_slider role=slider " + args) {}
 
-	virtual action take_action(const board &before)
+	virtual action take_action(const board &before, state &s)
 	{
 		board::reward maxFirstReward = INT_MIN;
 		int index = 0;
@@ -272,4 +283,108 @@ public:
 	}
 };
 
+class TDL_slider : public weight_agent{
+public:
+	TDL_slider(const std::string &args = "") : weight_agent("name=TDL_slider role=slider " + args) {
+		net.emplace_back(weight(15 * 15 * 15 * 15 * 15 * 15));
+		net.emplace_back(weight(15 * 15 * 15 * 15 * 15 * 15));
+		net.emplace_back(weight(15 * 15 * 15 * 15));
+		net.emplace_back(weight(15 * 15 * 15 * 15));
+		for(int i=0;i<4;i++){
+			net.emplace_back(weight(15 * 15 * 15 * 15 * 15 * 15));
+		}
+		alpha = 0.003125;
+		count = 0;
+	}
+												 
+	virtual action take_action(const board &before, state &s)
+	{	
+		s.isSlider = true;
+		float best_value = numeric_limits<float>::min();
+		int best_reward = INT_MIN;
+		int best_op = -1; 
+		for(int i=0;i<4;i++){
+			board tmp = board(before);
+			board::reward reward = tmp.slide(i);
+			if(reward == -1){
+				continue;
+			}
+			float value = get_value(tmp);
+
+			if(value + reward > best_value){
+				best_value = value +reward;
+				best_op = i;
+				best_reward = reward;
+			}
+		}
+
+		if(best_op == -1){
+			return action();
+		}
+		else{
+			return action::slide(best_op);
+			s.reward = best_reward;
+			s.value = best_value;
+		}
+	}
+
+	float get_value(const board &b){
+		float val = 0.0;
+		board tmp = board(b);
+		// isomorphism * 8 (rotate + reflect)
+		for(int i=0;i<2;i++){
+			for(int j=0;j<4;j++){
+				val += net[0][encode6(tmp, 0, 4, 8, 1, 5, 9)];
+				val += net[0][encode6(tmp, 1, 5, 9, 2, 6, 10)];
+				val += net[0][encode4(tmp, 2, 6, 10, 14)];
+				val += net[0][encode4(tmp, 3, 7, 11, 15)];
+
+				tmp.rotate_clockwise();
+			}
+			tmp.reflect_horizontal();
+		}
+	}
+
+	int encode4(const board& board, int a, int b, int c, int d){
+		return board(a) + board(b) * 16 + board(c) * 16 * 16 + board(d) * 16 * 16 * 16;
+	}
+
+	int encode6(const board& board, int a, int b, int c, int d, int e, int f){
+		return board(a) + board(b) * 16 + board(c) * 16 * 16 + board(d) * 16 * 16 * 16 + board(e) * 16 * 16 * 16 * 16 + board(f) * 16 * 16 * 16 * 16 * 16;
+	}
+
+	void adjust_weight(const board& b, float target){
+		target /= 32;
+		board tmp = board(b);
+
+		for(int i=0;i<2;i++){
+			for(int j=0;j<4;j++){
+				net[0][encode6(tmp, 0, 4, 8, 1, 5, 9)] += target;
+				net[0][encode6(tmp, 1, 5, 9, 2, 6, 10)] += target;
+				net[0][encode4(tmp, 2, 6, 10, 14)] += target;
+				net[0][encode4(tmp, 3, 7, 11, 15)] += target;
+
+				tmp.rotate_clockwise();
+			}
+			tmp.reflect_horizontal();
+		}
+	}
+
+	void update_value(stack<state> &s){
+		int cur_val = 0;
+		while(!s.empty()){
+			state cur = s.top();
+			s.pop();
+			int error = cur_val - cur.value;
+			adjust_weight(cur.after, alpha * error);
+			cur_val =  cur.reward + get_value(cur.after);
+		}
+	}
+
+private:
+	std::vector<weight> net;
+	board before, after;
+	float alpha;
+	int count;
+};
 
