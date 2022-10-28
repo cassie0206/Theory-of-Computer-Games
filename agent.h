@@ -217,71 +217,6 @@ private:
 	std::array<int, 4> opcode;
 };
 
-/**
- * greedy player, i.e., slider
- * select a legal action by greedy alg.
- */
-class greedy_slider : public random_agent
-{
-public:
-	greedy_slider(const std::string &args = "") : random_agent("name=greedy_slider role=slider " + args) {}
-	virtual action take_action(const board &before, state &s)
-	{
-		board::reward maxReward = INT_MIN;
-		int index = 0;
-
-		for(int i = 0; i < 4; i++){
-			board::reward rwd = board(before).slide(i);
-			if(maxReward < rwd){
-				maxReward = rwd;
-				index = i;
-			}
-		}
-		if(maxReward != -1) {
-			return action::slide(index);
-		}
-
-		return action();
-	}
-};
-
-/**
- * two step greedy player, i.e., slider
- * select a legal action by greedy alg.
- */
-class two_step_greedy_slider : public random_agent
-{
-public:
-	two_step_greedy_slider(const std::string &args = "") : random_agent("name=two_step_greedy_slider role=slider " + args) {}
-
-	virtual action take_action(const board &before, state &s)
-	{
-		board::reward maxFirstReward = INT_MIN;
-		int index = 0;
-
-		for(int i = 0; i < 4; i++){
-			board board1 = board(before);
-			board::reward FirstReward = board1.slide(i);
-			board::reward maxSecondReward = INT_MIN;	
-
-			for(int j = 0; j < 4; j++){
-				board board2 = board(board1);
-				maxSecondReward = max(maxSecondReward, board2.slide(j));
-			}
-
-			if(maxSecondReward + FirstReward > maxFirstReward){
-				maxFirstReward = maxSecondReward + FirstReward;
-				index = i;
-			}
-		}
-		if(maxFirstReward != -1) {
-			return action::slide(index);
-		}
-
-		return action();
-	}
-};
-
 class TDL_slider : public weight_agent{
 public:
 	TDL_slider(const std::string &args = "") : weight_agent("name=TDL_slider role=slider " + args) {
@@ -291,7 +226,7 @@ public:
 		if (meta.find("load") != meta.end())
 			load_weights(meta["load"]);
 
-		alpha = 0.003125;
+		//alpha = 0.003125;
 		count = 0;
 	}
 	virtual ~TDL_slider()
@@ -303,7 +238,8 @@ public:
 	virtual action take_action(const board &before, state &s)
 	{	
 		s.isSlider = true;
-		float best_value = numeric_limits<float>::min();
+		float best_value = -numeric_limits<float>::max();
+		float best_cur_val = -numeric_limits<float>::max();
 		int best_reward = INT_MIN;
 		int best_op = -1; 
 		for(int i=0;i<4;i++){
@@ -315,9 +251,10 @@ public:
 			float value = get_value(tmp);
 
 			if(value + reward > best_value){
-				best_value = value +reward;
+				best_value = value + reward;
 				best_op = i;
 				best_reward = reward;
+				best_cur_val = value;
 			}
 		}
 
@@ -327,7 +264,7 @@ public:
 		else{
 			return action::slide(best_op);
 			s.reward = best_reward;
-			s.value = best_value;
+			s.value = best_cur_val;
 		}
 	}
 
@@ -338,9 +275,9 @@ public:
 		for(int i=0;i<2;i++){
 			for(int j=0;j<4;j++){
 				val += net[0][encode6(tmp, 0, 1, 2, 3, 4, 5)];
-				val += net[0][encode6(tmp, 4, 5, 6, 7, 8, 9)];
-				val += net[0][encode6(tmp, 5, 6, 7, 9, 10, 11)];
-				val += net[0][encode6(tmp, 9, 10, 11, 13, 14, 15)];
+				val += net[1][encode6(tmp, 4, 5, 6, 7, 8, 9)];
+				val += net[2][encode6(tmp, 5, 6, 7, 9, 10, 11)];
+				val += net[3][encode6(tmp, 9, 10, 11, 13, 14, 15)];
 
 				tmp.rotate_clockwise();
 			}
@@ -358,15 +295,14 @@ public:
 	}
 
 	void adjust_weight(const board& b, float target){
-		target /= 32;
 		board tmp = board(b);
 
 		for(int i=0;i<2;i++){
 			for(int j=0;j<4;j++){
 				net[0][encode6(tmp, 0, 1, 2, 3, 4, 5)] += target;
-				net[0][encode6(tmp, 4, 5, 6, 7, 8, 9)] += target;
-				net[0][encode6(tmp, 5, 6, 7, 9, 10, 11)] += target;
-				net[0][encode6(tmp, 9, 10, 11, 13, 14, 15)] += target;
+				net[1][encode6(tmp, 4, 5, 6, 7, 8, 9)] += target;
+				net[2][encode6(tmp, 5, 6, 7, 9, 10, 11)] += target;
+				net[3][encode6(tmp, 9, 10, 11, 13, 14, 15)] += target;
 
 				tmp.rotate_clockwise();
 			}
@@ -379,7 +315,7 @@ public:
 		while(!s.empty()){
 			state cur = s.top();
 			s.pop();
-			int error = cur_val - cur.value;
+			float error = cur_val - cur.value;
 			adjust_weight(cur.after, alpha * error);
 			cur_val =  cur.reward + get_value(cur.after);
 		}
@@ -387,8 +323,6 @@ public:
 
 private:
 	std::vector<weight> net;
-	board before, after;
 	float alpha;
 	int count;
 };
-
