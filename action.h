@@ -18,7 +18,6 @@ public:
 	action(unsigned code = -1u) : code(code) {}
 	action(const action& a) : code(a.code) {}
 	virtual ~action() {}
-
 	class place; // create a placing action with position and a color
 	class black; // create a placing action of black with position
 	class white; // create a placing action of white with position
@@ -71,6 +70,7 @@ public:
 	board::piece_type color() const { return static_cast<board::piece_type>(event() >> 16); }
 public:
 	board::reward apply(board& b) const { return b.place(position(), color()); }
+	board::reward color_apply(board& b, board::piece_type who) const { return b.place(position(), who); }
 	std::ostream& operator >>(std::ostream& out) const {
 		return out << ';' << "?BW?"[color() & 0b11] << '[' << char('a' + position().x)
 		           << char('a' + ((board::size_y - 1) - position().y)) << ']';
@@ -102,6 +102,7 @@ public:
 	black(int i) : action::place(i, board::black) {}
 	black(const board::point& p) : action::place(p, board::black) {}
 	black(const action& a = {}) : action::place(a) {}
+	board::reward color_apply(board& b) const { return b.place(position(), board::black); }
 protected:
 	action& reinterpret(const action* a) const { return *new (const_cast<action*>(a)) black(*a); }
 	static __attribute__((constructor)) void init() { entries()[type_flag('B')] = new black; }
@@ -114,6 +115,7 @@ public:
 	white(int i) : action::place(i, board::white) {}
 	white(const board::point& p) : action::place(p, board::white) {}
 	white(const action& a = {}) : action::place(a) {}
+	board::reward color_apply(board& b) const { return b.place(position(), board::white); }
 protected:
 	action& reinterpret(const action* a) const { return *new (const_cast<action*>(a)) white(*a); }
 	static __attribute__((constructor)) void init() { entries()[type_flag('W')] = new white; }

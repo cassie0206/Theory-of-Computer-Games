@@ -74,7 +74,7 @@ int main(int argc, const char* argv[]) {
 
 	if (!shell) { // launch standard local games
 		while (!stats.is_finished()) {
-//			std::cerr << "======== Game " << stats.step() << " ========" << std::endl;
+			std::cerr << "======== Game " << stats.step() << " ========" << std::endl;
 			black.open_episode("~:" + white.name());
 			white.open_episode(black.name() + ":~");
 

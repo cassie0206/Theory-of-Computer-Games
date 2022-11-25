@@ -75,14 +75,14 @@ public:
 protected:
 	std::default_random_engine engine;
 	clock_t timeout = -1;
-	int simulation_time = -1;
+	int simulation_time = 100;
 };
 
 /**
  * random player for both side
  * put a legal piece randomly
  */
-/*class player : public random_agent {
+class player : public random_agent {
 public:
 	player(const std::string& args = "") : random_agent("name=random role=unknown " + args),
 		space(board::size_x * board::size_y), who(board::empty) {
@@ -110,7 +110,7 @@ private:
 	std::vector<action::place> space;
 	board::piece_type who;
 };
-*/
+
 /**
  * random player for both side
  * put a legal piece randomly
@@ -128,16 +128,16 @@ public:
 		for (size_t i = 0; i < space.size(); i++)
 			space[i] = action::place(i, who);
 		for (size_t i = 0; i < space.size(); i++)
-			black_space[i] = action::place(i, board::black);
+			black_space[i] = action::black(i);
 		for (size_t i = 0; i < space.size(); i++)
-			white_space[i] = action::place(i, board::white);
+			white_space[i] = action::white(i);
 	}
 
 	struct Node{
 		int Tn = 0; // the visited time 
 		int x = 0; // reward (# of win)
 		Node* parent = NULL;
-		vector<Node*> childs;
+		vector<Node*> children;
 		board state;
 		action::place parent_move;
 		double UCT_val = 0;
@@ -145,6 +145,9 @@ public:
 	};
 
 	void calculate_UCT(Node* n){
+		//cout<<"x: "<<n->x<<endl;
+		//cout<<"Tn: "<<n->Tn<<endl;
+		//cout<<"n parent Tn: "<<n->parent->Tn<<endl;
 		double exploit = (double)n->x / (double)n->Tn;
 		double explore= 0.5 * sqrt(((double) log(n->parent->Tn) / n->Tn));
 		n->UCT_val = exploit + explore;
@@ -170,58 +173,65 @@ public:
 
 	Node* selection(Node* root){
 		Node* cur = root;
-		board::piece_type curWho = who;
 
-		while(cur->childs.size() != 0){
+		while(cur->children.size() != 0){
 			double max_UCT = -1;
-			int index = 0;
-			for(int i=0;i<cur->childs.size();i++){
-				if(cur->childs[i]->UCT_val > max_UCT){
-					max_UCT = cur->childs[i]->UCT_val;
-					index = i;
-					curWho = turn_who(curWho);
-					cur->childs[i]->who = curWho;
+			Node* best_child = NULL;
+			//cout<<"selection children size: "<<cur->children.size()<<endl;
+			for(unsigned long int i=0;i<cur->children.size();i++){
+				//cout<<"before UCT\n";
+				calculate_UCT(cur->children[i]);
+				//cout<<"after UCT\n";
+				//cout<<"children UCT: "<<cur->children[i]->UCT_val<<endl;
+				if(cur->children[i]->UCT_val > max_UCT){
+					max_UCT = cur->children[i]->UCT_val;
+					best_child = cur->children[i];
 				}
+				//cout<<"if end\n";
 			}
-			cur = cur->childs[index];
+			cur = best_child;
 		}
 
 		return cur;
 	}
 
-	Node* expansion(Node* n){
-		std::vector<action::place> cur_space = which_space(n->who);
+	void expansion(Node* n){
+		board::piece_type nextWho = turn_who(n->who);
+		//std::vector<action::place> cur_space = which_space(nextWho);
 		std::shuffle(space.begin(), space.end(), engine);
-		for (const action::place& move : cur_space) {
+		for (const action::place& move : space) {
 			board after = n->state;
-			if (move.apply(after) == board::legal){
+			if (move.color_apply(after, n->who) == board::legal){
+				//cout<<"legal\n";
 				Node* child = new Node;
 				child->parent = n;
-				n->childs.push_back(child);
-				child->who = turn_who(n->who);
+				n->children.push_back(child);
+				child->state = after;
+				child->who = nextWho;
 				n->parent_move = move;
-				n->Tn++;
-				return child;
 			}		
 		}
+		//cout<<"expand children size: "<<n->children.size()<<endl;
 	}
 
 	int simulation(Node* n){
 		Node* cur = n;
 		board cur_state = n->state;
+		board::piece_type curWho = n->who;
 		while(1){
 			bool flag = false;
-			std::vector<action::place> cur_space = which_space(n->who);
+			//std::vector<action::place> cur_space = which_space(curWho);
 			std::shuffle(space.begin(), space.end(), engine);
-			for (const action::place& move : cur_space) {
+			for (const action::place& move : space) {
 				board after = cur_state;
-				if (move.apply(after) == board::legal){
+				if (move.color_apply(after, curWho) == board::legal){
 					cur_state = after;
+					curWho = turn_who(curWho);
 					flag =true;
 					break;
 				}		
 			}
-
+			// terminal node
 			if(!flag){
 				if(cur->who == who){//lose
 					return 0;
@@ -230,18 +240,33 @@ public:
 					return 1;
 				}
 			}
-			cur = cur->childs[cur->childs.size() - 1];
 		}
 	}
 
 	void backpropagation(Node* n, int re){
-		Node* cur = n;//expansion node
+		Node* cur = n; //expansion node
 		while(cur->parent != NULL){
 			cur->Tn++;
 			cur->x += re;
-			calculate_UCT(cur);
 			cur = cur->parent;
 		}
+		//root
+		cur->Tn++;
+		cur->x += re;
+	}
+
+	void delete_tree(Node* n){
+		if(n->children.size() == 0){
+			delete n;
+			return;
+		}
+
+		for(unsigned long int i=0;i<n->children.size();i++){
+			delete_tree(n->children[i]);
+		}
+		n->children.clear();
+		delete n;
+		return;
 	}
 
 	void MCTS(Node* root){
@@ -251,44 +276,66 @@ public:
 
 		while(1){
 			Node* leaf = selection(root);
-			Node* newNode = expansion(leaf);
+			//cout<<"finish selection\n";	
+			expansion(leaf);
+			//cout<<"finish expansion\n";
+			Node* newNode;
+			if(leaf->children.size() == 0){
+				newNode = leaf;
+			}
+			else{
+				std::random_device rd;
+				std::default_random_engine rng(rd());
+				shuffle(leaf->children.begin(), leaf->children.end(), rng);
+				newNode = leaf->children[0];
+			}
 			int re = simulation(newNode);
+			//cout<<"finish simulation\n";
 			backpropagation(newNode, re);
+			//cout<<"finish backpropagation\n";
 			time++;
 
+			// trminal condition
 			if(timeout != -1){
 				END_TIME = clock();
-				if(timeout > END_TIME - START_TIME){
+				if(timeout < END_TIME - START_TIME){
 					break;
 				}
+				continue;
 			}
+			//cout<<"1\n";
 			if(simulation_time != -1 && time == simulation_time){
 				break;
 			}
+			//cout<<"2\n";
 		}
 	}
 
 	virtual action take_action(const board& state) {
-		Node* root;
+		//cout<<"***********************************agent check********************************************************************\n";
+		Node* root = new Node;
 		root->state = state;
-		root->who;
+		root->who = who;
 		MCTS(root);
+		//cout<<"MCTS FINISH\n";
 
-		double max_UCT;
-		int index = 0;
-		for(int i=0;i<root->childs.size();i++){
-			if(root->childs[i]->UCT_val > max_UCT){
-				root->childs[i]->UCT_val = max_UCT;
-				index = i;
+		int max_count = -1;
+		action best_move;
+		int size = root->children.size();
+		//cout<<"CHILDREN SIZE: "<<size<<endl;
+		for(int i=0;i<size;i++){
+			if(root->children[i]->Tn > max_count){
+				max_count = root->children[i]->Tn;
+				best_move = root->children[i]->parent_move;
 			}
 		}
 
-		return root->childs[index]->parent_move;
+		//root->children.clear();
+		//delete root;
+		delete_tree(root);
+
+		return best_move;
 	}
-
-
-
-
 
 private:
 	std::vector<action::place> space;// next legal move place
