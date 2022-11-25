@@ -148,9 +148,7 @@ public:
 		//cout<<"x: "<<n->x<<endl;
 		//cout<<"Tn: "<<n->Tn<<endl;
 		//cout<<"n parent Tn: "<<n->parent->Tn<<endl;
-		double exploit = (double)n->x / (double)n->Tn;
-		double explore= 0.5 * sqrt(((double) log(n->parent->Tn) / n->Tn));
-		n->UCT_val = exploit + explore;
+		n->UCT_val = ((double)n->x / n->Tn) + sqrt(2) * sqrt( log((double)n->parent->Tn) / n->Tn);
 	}
 
 	board::piece_type turn_who(board::piece_type who){
@@ -195,28 +193,52 @@ public:
 		return cur;
 	}
 
-	void expansion(Node* n){
-		board::piece_type nextWho = turn_who(n->who);
+	void expansion(Node* n){// n is selected leaf node
+		board::piece_type nextWho = (n->who == board::black ? board::white : board::black);
 		//std::vector<action::place> cur_space = which_space(nextWho);
-		std::shuffle(space.begin(), space.end(), engine);
-		for (const action::place& move : space) {
+		//std::shuffle(space.begin(), space.end(), engine);		
+		/*for (const action::place& move : space) {
 			board after = n->state;
 			if (move.color_apply(after, n->who) == board::legal){
 				//cout<<"legal\n";
 				Node* child = new Node;
 				child->parent = n;
-				n->children.push_back(child);
 				child->state = after;
 				child->who = nextWho;
-				n->parent_move = move;
+				child->parent_move = move;
+				n->children.push_back(child);
 			}		
+		}*/
+		for(unsigned long int i=0;i<space.size();i++){
+			board after = n->state;
+			if(space[i].color_apply(after, n->who) != board::legal){
+				continue;
+			}
+			Node* child = new Node;
+			child->state = after;
+			child->parent = n;
+			child->parent_move = space[i];
+			child->who = nextWho;
+			n->children.push_back(child);
 		}
+		/*std::vector<action::place> cur_space = (n->who == board::black ? black_space : white_space);
+		for(unsigned long int i=0;i<cur_space.size();i++){
+			board after = n->state;
+			if(cur_space[i].apply(after) != board::legal){
+				continue;
+			}
+			Node* child = new Node;
+			child->state = after;
+			child->parent = n;
+			child->parent_move = cur_space[i];
+			child->who = nextWho;
+			n->children.push_back(child);
+		}*/
 		//cout<<"expand children size: "<<n->children.size()<<endl;
 	}
 
 	int simulation(Node* n){
-		Node* cur = n;
-		board cur_state = n->state;
+		/*board cur_state = n->state;
 		board::piece_type curWho = n->who;
 		while(1){
 			bool flag = false;
@@ -233,26 +255,44 @@ public:
 			}
 			// terminal node
 			if(!flag){
-				if(cur->who == who){//lose
-					return 0;
-				}
-				else{//win
+				if(curWho == who){//lose
 					return 1;
 				}
+				else{//win
+					return 0;
+				}
 			}
+		}*/
+		board::piece_type curWho = n->who;
+		board cur_state = n->state;
+
+		while(1){
+			//std::vector<action::place> cur_space = (curWho == board::black ? black_space : white_space);
+			std::shuffle(space.begin(), space.end(), engine);
+			for(unsigned long int i=0;i<space.size();i++){// continue playing without recording
+				board after = cur_state;
+				if(space[i].color_apply(after, curWho) == board::legal){
+					cur_state = after;
+					break;
+				}
+				if(i == space.size() - 1){
+					// if the same with current player(who), loss. Otherwise, win
+					// since if the same means that current player can't continue to play
+					return (curWho == who ? 0 : 1);
+				}
+			}			
+			curWho = (curWho == board::black ? board::white : board::black);
+
 		}
 	}
 
 	void backpropagation(Node* n, int re){
 		Node* cur = n; //expansion node
-		while(cur->parent != NULL){
+		while(cur != NULL){
 			cur->Tn++;
 			cur->x += re;
 			cur = cur->parent;
 		}
-		//root
-		cur->Tn++;
-		cur->x += re;
 	}
 
 	void delete_tree(Node* n){
@@ -284,9 +324,7 @@ public:
 				newNode = leaf;
 			}
 			else{
-				std::random_device rd;
-				std::default_random_engine rng(rd());
-				shuffle(leaf->children.begin(), leaf->children.end(), rng);
+				std::shuffle(leaf->children.begin(), leaf->children.end(), engine);
 				newNode = leaf->children[0];
 			}
 			int re = simulation(newNode);
@@ -322,6 +360,7 @@ public:
 		int max_count = -1;
 		action best_move;
 		int size = root->children.size();
+		//double max_UCT = -1;
 		//cout<<"CHILDREN SIZE: "<<size<<endl;
 		for(int i=0;i<size;i++){
 			if(root->children[i]->Tn > max_count){
@@ -329,7 +368,6 @@ public:
 				best_move = root->children[i]->parent_move;
 			}
 		}
-
 		//root->children.clear();
 		//delete root;
 		delete_tree(root);
