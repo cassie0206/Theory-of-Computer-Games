@@ -313,6 +313,7 @@ public:
 		clock_t START_TIME, END_TIME;
 		START_TIME = clock();
 		int time = 0;
+		
 
 		while(1){
 			Node* leaf = selection(root);
