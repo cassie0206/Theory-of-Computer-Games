@@ -144,11 +144,11 @@ public:
 		board::piece_type who;
 	};
 
-	void calculate_UCT(Node* n){
+	void calculate_UCT(Node* n, int total_visit_count){
 		//cout<<"x: "<<n->x<<endl;
 		//cout<<"Tn: "<<n->Tn<<endl;
 		//cout<<"n parent Tn: "<<n->parent->Tn<<endl;
-		n->UCT_val = ((double)n->x / n->Tn) + sqrt(2) * sqrt( log((double)n->parent->Tn) / n->Tn);
+		n->UCT_val = ((double)n->x / n->Tn) + sqrt(2) * sqrt( log((double)total_visit_count) / n->Tn);
 	}
 
 	board::piece_type turn_who(board::piece_type who){
@@ -160,16 +160,16 @@ public:
 		}
 	}
 
-	std::vector<action::place> which_space(board::piece_type who){
+	/*std::vector<action::place> which_space(board::piece_type who){
 		if(who == board::black){
 			return black_space;
 		}
 		else{
 			return white_space;
 		}
-	}
+	}*/
 
-	Node* selection(Node* root){
+	Node* selection(Node* root, int total_visit_count){
 		Node* cur = root;
 
 		while(cur->children.size() != 0){
@@ -178,7 +178,7 @@ public:
 			//cout<<"selection children size: "<<cur->children.size()<<endl;
 			for(unsigned long int i=0;i<cur->children.size();i++){
 				//cout<<"before UCT\n";
-				calculate_UCT(cur->children[i]);
+				calculate_UCT(cur->children[i], total_visit_count);
 				//cout<<"after UCT\n";
 				//cout<<"children UCT: "<<cur->children[i]->UCT_val<<endl;
 				if(cur->children[i]->UCT_val > max_UCT){
@@ -194,7 +194,7 @@ public:
 	}
 
 	void expansion(Node* n){// n is selected leaf node
-		board::piece_type nextWho = (n->who == board::black ? board::white : board::black);
+		//board::piece_type nextWho = (n->who == board::black ? board::white : board::black);
 		//std::vector<action::place> cur_space = which_space(nextWho);
 		//std::shuffle(space.begin(), space.end(), engine);		
 		/*for (const action::place& move : space) {
@@ -209,7 +209,7 @@ public:
 				n->children.push_back(child);
 			}		
 		}*/
-		for(unsigned long int i=0;i<space.size();i++){
+		/*for(unsigned long int i=0;i<space.size();i++){
 			board after = n->state;
 			if(space[i].color_apply(after, n->who) != board::legal){
 				continue;
@@ -220,7 +220,7 @@ public:
 			child->parent_move = space[i];
 			child->who = nextWho;
 			n->children.push_back(child);
-		}
+		}*/
 		/*std::vector<action::place> cur_space = (n->who == board::black ? black_space : white_space);
 		for(unsigned long int i=0;i<cur_space.size();i++){
 			board after = n->state;
@@ -235,6 +235,35 @@ public:
 			n->children.push_back(child);
 		}*/
 		//cout<<"expand children size: "<<n->children.size()<<endl;
+		board::piece_type nextWho = (n->who == board::black ? board::white : board::black);
+		if(nextWho == board::black){
+			for(unsigned long int i=0;i<black_space.size();i++){
+				board after = n->state;
+				if(black_space[i].apply(after) != board::legal){
+					continue;
+				}
+				Node* child = new Node;
+				child->state = after;
+				child->parent = n;
+				child->parent_move = black_space[i];
+				child->who = nextWho;
+				n->children.push_back(child);
+			}
+		}
+		else{
+			for(unsigned long int i=0;i<white_space.size();i++){
+				board after = n->state;
+				if(white_space[i].apply(after) != board::legal){
+					continue;
+				}
+				Node* child = new Node;
+				child->state = after;
+				child->parent = n;
+				child->parent_move = white_space[i];
+				child->who = nextWho;
+				n->children.push_back(child);
+			}
+		}
 	}
 
 	int simulation(Node* n){
@@ -268,20 +297,37 @@ public:
 
 		while(1){
 			//std::vector<action::place> cur_space = (curWho == board::black ? black_space : white_space);
-			std::shuffle(space.begin(), space.end(), engine);
-			for(unsigned long int i=0;i<space.size();i++){// continue playing without recording
-				board after = cur_state;
-				if(space[i].color_apply(after, curWho) == board::legal){
-					cur_state = after;
-					break;
-				}
-				if(i == space.size() - 1){
-					// if the same with current player(who), loss. Otherwise, win
-					// since if the same means that current player can't continue to play
-					return (curWho == who ? 0 : 1);
-				}
-			}			
 			curWho = (curWho == board::black ? board::white : board::black);
+			if(curWho == board::black){
+				std::shuffle(black_space.begin(), black_space.end(), engine);
+				for(unsigned long int i=0;i<black_space.size();i++){// continue playing without recording
+					board after = cur_state;
+					if(black_space[i].apply(after) == board::legal){
+						cur_state = after;
+						break;
+					}
+					if(i == black_space.size() - 1){
+						// if the same with current player(who), loss. Otherwise, win
+						// since if the same means that current player can't continue to play
+						return (curWho == who ? 0 : 1);
+					}
+				}		
+			}
+			else{
+				std::shuffle(white_space.begin(), white_space.end(), engine);
+				for(unsigned long int i=0;i<white_space.size();i++){// continue playing without recording
+					board after = cur_state;
+					if(white_space[i].apply(after) == board::legal){
+						cur_state = after;
+						break;
+					}
+					if(i == white_space.size() - 1){
+						// if the same with current player(who), loss. Otherwise, win
+						// since if the same means that current player can't continue to play
+						return (curWho == who ? 0 : 1);
+					}
+				}	
+			}
 
 		}
 	}
@@ -314,9 +360,10 @@ public:
 		START_TIME = clock();
 		int time = 0;
 		
-
+		int total_visit_count = 0;
 		while(1){
-			Node* leaf = selection(root);
+			Node* leaf = selection(root, total_visit_count);
+			total_visit_count++;
 			//cout<<"finish selection\n";	
 			expansion(leaf);
 			//cout<<"finish expansion\n";
@@ -378,8 +425,7 @@ public:
 
 private:
 	std::vector<action::place> space;// next legal move place
-	std::vector<action::place> black_space;
-	std::vector<action::place> white_space;
+	std::vector<action::black> black_space;
+	std::vector<action::white> white_space;
 	board::piece_type who;
 };
-
