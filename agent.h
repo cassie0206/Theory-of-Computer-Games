@@ -19,6 +19,7 @@
 #include <cmath>
 #include <random>
 #include <ctime>
+#include <climits>
 #include "board.h"
 #include "action.h"
 
@@ -141,28 +142,30 @@ public:
 		vector<Node*> children;
 		board state;
 		action::place parent_move;
-		double UCT_val = 0x7fffffff;
+		double UCT_val = LLONG_MAX;
 		board::piece_type who;
 	};
 
-	void calculate_UCT(Node* n, int total_visit_count){
+	void calculate_UCT(Node* n){
 		if(n->x == 0 || n->Tn == 0) return;
-		n->UCT_val = (double)((double)n->x / n->Tn) + 0.5 * (double)sqrt( (double)log((double)total_visit_count) / n->Tn);
+		n->UCT_val = (double)((double)n->x / n->Tn) + 0.5 * (double)sqrt( (double)log((double)n->parent->Tn) / n->Tn);
 	}
 
-	Node* selection(Node* root, int total_visit_count){
+	Node* selection(Node* root){
 		Node* cur = root;
-		int idx = -1;
+
 		while(cur->children.size() != 0){
 			double max_UCT = -1;
 			Node* best_child = NULL;
 			
 			for(size_t i=0;i<cur->children.size();i++){
 				if (cur->children[i]->Tn == 0){
-					idx = i;
+					// not explore
 					best_child = cur->children[i];
 					return best_child;
 				}
+
+				calculate_UCT(cur->children[i]);
 				if(cur->children[i]->UCT_val > max_UCT){
 					max_UCT = cur->children[i]->UCT_val;
 					best_child = cur->children[i];
@@ -204,10 +207,9 @@ public:
 				n->children.push_back(child);
 			}
 		}
-			
 	}
 
-	board::piece_type simulation(Node* n){
+	int simulation(Node* n){
 		board::piece_type curWho = n->who;
 		board cur_state = n->state;
 
@@ -224,7 +226,7 @@ public:
 					if(i == black_space.size() - 1){
 						// if the same with current player(who), loss. Otherwise, win
 						// since if the same means that current player can't continue to play
-						return board::white;
+						return who == board::white ? 1 : 0;
 					}
 				}		
 			}
@@ -239,7 +241,7 @@ public:
 					if(i == white_space.size() - 1){
 						// if the same with current player(who), loss. Otherwise, win
 						// since if the same means that current player can't continue to play
-						return board::black;
+						return who == board::black ? 1 : 0;
 					}
 				}	
 			}
@@ -247,19 +249,12 @@ public:
 		}
 	}
 
-	void backpropagation(Node* root, Node* cur, board::piece_type winner) {
-		bool win = true;
-		if(winner == root->who){
-			win = false;
-			root->x++;
-		}
+	void backpropagation(Node* root, Node* cur, int re) {
+		root->x+=re;
 		root->Tn++;
 		while(cur != NULL && cur != root) {
 			cur->Tn++;
-			if(win == true){
-				cur->x++;
-			}
-			calculate_UCT(cur, cur->parent->Tn+1);
+			cur->x+=re;
 			cur = cur->parent;
 		}
 	}
@@ -280,11 +275,9 @@ public:
 
 	void MCTS(Node* root){
 		int time = 0;
-		int total_visit_count = 0;
 		
 		while(1){
-			Node* leaf = selection(root, total_visit_count);
-			total_visit_count++;
+			Node* leaf = selection(root);
 			expansion(leaf);
 			Node* newNode;
 			if(leaf->children.size() == 0){
@@ -294,7 +287,7 @@ public:
 				std::shuffle(leaf->children.begin(), leaf->children.end(), engine);
 				newNode = leaf->children[0];
 			}
-			board::piece_type re = simulation(newNode);
+			int re = simulation(newNode);
 			backpropagation(root, newNode, re);
 			time++;
 
@@ -321,7 +314,7 @@ public:
 		}
 
 		delete_tree(root);
-		// free(root);
+		
 		return best_move;
 	}
 
