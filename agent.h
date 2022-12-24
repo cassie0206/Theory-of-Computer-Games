@@ -101,6 +101,8 @@ public:
 			load_weights(meta["load"]);*/
 		if (meta.find("alpha") != meta.end())
 			alpha = float(meta["alpha"]);
+		if (meta.find("step") != meta.end())
+			step = int(meta["step"]);
 	}
 	/*virtual ~weight_agent()
 	{
@@ -146,6 +148,7 @@ protected:
 protected:
 	std::vector<weight> net;
 	float alpha;
+	int step=1;
 };
 
 /**
@@ -248,7 +251,7 @@ public:
 			if(reward == -1){
 				continue;
 			}
-			float value = get_value(tmp);
+			float value = expectimax(tmp);
 
 			if(value + reward > best_value){
 				best_value = value + reward;
@@ -286,6 +289,44 @@ public:
 		return val;
 	}
 
+	float expectimax(const board &b){
+		vector<int> unoccupied;
+
+		for(int i=0;i<16;i++){
+			if(b(i) == 0){
+				unoccupied.push_back(i);
+			}
+		}
+
+		//initial tile may be 1, 2, 3
+		float total_val = 0.0;
+		int num = 0;
+		for(board::cell i=1;i<4;i++){
+			for(int pos:unoccupied){
+				board tmp = b;
+				tmp.set_tile(pos, i);
+				float best_val = -numeric_limits<float>::max();
+				num++;
+
+				for(int j=0;j<4;j++){
+					board tmp_after = tmp;
+					board::reward reward = tmp_after.slide(j);
+					if(reward == -1){
+						continue;
+					}
+
+					float val = get_value(tmp_after);
+					if(reward + val > best_val){
+						best_val = reward + val;
+					}
+				}
+				total_val += best_val;
+			}
+		}
+
+		return (total_val / num);
+	}
+
 	int encode6(const board& board, int a, int b, int c, int d, int e, int f){
 		return (board(a) << 0) | (board(b) << 4) | (board(c) << 8) | (board(d) << 12) | (board(e) << 16) | (board(f) << 20);
 	}
@@ -306,17 +347,28 @@ public:
 		}
 	}
 
-	void update_value(stack<state> &s){
-		float cur_val = 0;
-		while(!s.empty()){
-			state cur = s.top();
-			s.pop();
-			float error = cur_val - cur.value;
-			adjust_weight(cur.after, alpha * error);
-			cur_val =  cur.reward + get_value(cur.after);
+	void update_value(vector<state> &v){
+		for(int i = v.size() - 1 ; i >= 0 ; i--){
+			board::reward total_reward = 0;
+			float error;
+			bool flag = false;
+			for(int j = 1 ; j <= step ; j++){
+				if(i + j >= int(v.size())){
+					error = total_reward + 0 - get_value(v[i].after);
+					flag = true;
+					break;
+				} 
+				total_reward += v[i + j].reward;
+			}
+
+			if(!flag){
+				error = total_reward + get_value(v[i + step].after) - get_value(v[i].after);
+			}
+			adjust_weight(v[i].after, alpha * error);
 		}
 	}
 
 private:
+	std::array<int, 4> opcode;
 	int count;
 };

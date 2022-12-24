@@ -64,12 +64,9 @@ int main(int argc, const char* argv[]) {
 		if (stats.is_finished()) stats.summary();
 	}
 
-	//random_slider slide(slide_args);
-	//two_step_greedy_slider slide(slide_args);
-	//greedy_slider slide(slide_args);
 	TDL_slider slide(slide_args);
 	random_placer place(place_args);
-	stack<state> vs;
+	vector<state> vs;
 
 	while (!stats.is_finished()) {
 //		std::cerr << "======== Game " << stats.step() << " ========" << std::endl;
@@ -87,7 +84,7 @@ int main(int argc, const char* argv[]) {
 			if (game.apply_action(move) != true) break;
 			s.after =game.state();
 			if(s.isSlider){
-				vs.push(s);
+				vs.push_back(s);
 			}
 			if (who.check_for_win(game.state())) break;
 		}
@@ -96,6 +93,7 @@ int main(int argc, const char* argv[]) {
 		stats.close_episode(win.name());
 
 		slide.update_value(vs);
+		vs.clear();
 		slide.close_episode(win.name());
 		place.close_episode(win.name());
 	}
