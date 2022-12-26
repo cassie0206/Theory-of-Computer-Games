@@ -11,14 +11,11 @@
 #include <fstream>
 #include <iterator>
 #include <string>
-#include <stack>
 #include "board.h"
 #include "action.h"
 #include "agent.h"
 #include "episode.h"
 #include "statistics.h"
-
-using namespace std;
 
 int main(int argc, const char* argv[]) {
 	std::cout << "Threes! Demo: ";
@@ -64,9 +61,11 @@ int main(int argc, const char* argv[]) {
 		if (stats.is_finished()) stats.summary();
 	}
 
-	TDL_slider slide(slide_args);
+	//random_slider slide(slide_args);
 	random_placer place(place_args);
-	vector<state> vs;
+	// greedy_slider slide(slide_args);
+	TDL_slider slide(slide_args);
+	std::vector<state> path;
 
 	while (!stats.is_finished()) {
 //		std::cerr << "======== Game " << stats.step() << " ========" << std::endl;
@@ -76,25 +75,28 @@ int main(int argc, const char* argv[]) {
 		stats.open_episode(slide.name() + ":" + place.name());
 		episode& game = stats.back();
 		while (true) {
-			state s;
-			s.before = game.state();
+			float state_value = 0.0;
+			int reward = 0;
+			state s1;
+			s1.before = game.state();
 			agent& who = game.take_turns(slide, place);
-			action move = who.take_action(game.state(), s);
+			action move = who.take_action(game.state(), state_value, reward);
 //			std::cerr << game.state() << "#" << game.step() << " " << who.name() << ": " << move << std::endl;
 			if (game.apply_action(move) != true) break;
-			s.after =game.state();
+			s1.after = game.state();
+			s1.reward = reward;
+			s1.value = state_value;		//store afterstate value to calculate td error
+
 
 			if (who.check_for_win(game.state())) break;
-			if(s.isSlider){
-				vs.push_back(s);
+			if (reward != 0 || state_value != 0) {
+				path.push_back(s1);
 			}
 		}
-
 		agent& win = game.last_turns(slide, place);
 		stats.close_episode(win.name());
-
-		slide.update_value(vs);
-		vs.clear();
+		slide.update_value(path);
+    	path.clear();
 		slide.close_episode(win.name());
 		place.close_episode(win.name());
 	}
@@ -104,6 +106,5 @@ int main(int argc, const char* argv[]) {
 		out << stats;
 		out.close();
 	}
-
 	return 0;
 }
