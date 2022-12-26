@@ -83,10 +83,11 @@ int main(int argc, const char* argv[]) {
 //			std::cerr << game.state() << "#" << game.step() << " " << who.name() << ": " << move << std::endl;
 			if (game.apply_action(move) != true) break;
 			s.after =game.state();
+
+			if (who.check_for_win(game.state())) break;
 			if(s.isSlider){
 				vs.push_back(s);
 			}
-			if (who.check_for_win(game.state())) break;
 		}
 
 		agent& win = game.last_turns(slide, place);

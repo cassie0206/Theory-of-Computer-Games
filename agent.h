@@ -229,7 +229,7 @@ public:
 		}
 		if (meta.find("load") != meta.end())
 			load_weights(meta["load"]);
-
+		cout<<"number of step: "<<step<<"\n";
 		count = 0;
 	}
 	virtual ~TDL_slider()
@@ -251,7 +251,7 @@ public:
 			if(reward == -1){
 				continue;
 			}
-			float value = expectimax(tmp);
+			float value = expectimax(tmp, i);
 
 			if(value + reward > best_value){
 				best_value = value + reward;
@@ -261,7 +261,7 @@ public:
 			}
 		}
 
-		if(best_op != -1 && best_reward != -1){
+		if(best_op != -1){
 			s.reward = best_reward;
 			s.value = best_cur_val;
 			return action::slide(best_op);
@@ -289,43 +289,65 @@ public:
 		return val;
 	}
 
-	float expectimax(const board &b){
-		vector<int> unoccupied;
-
-		for(int i=0;i<16;i++){
+	float expectimax(const board &b, int op){
+		std::vector<int> empty_tile;
+		int num_empty = 0;
+		std::vector<int> spaces[4];
+		spaces[0] = { 12, 13, 14, 15 };
+		spaces[1] = { 0, 4, 8, 12 };
+		spaces[2] = { 0, 1, 2, 3};
+		spaces[3] = { 3, 7, 11, 15 };
+		//std::vector<int> space = spaces[b.last()];
+		std::vector<int> space = spaces[op];
+		//cout<<"EMPTY: ";
+		for(int i : space){
 			if(b(i) == 0){
-				unoccupied.push_back(i);
-			}
+				num_empty++;
+				empty_tile.push_back(i);
+				//cout<<i<<" ";
+			} 
 		}
+		//cout<<endl;
+		int bag[3], num = 0;
+		for (board::cell t = 1; t <= 3; t++)
+			for (size_t i = 0; i < b.bag(t); i++)
+				bag[num++] = t;
 
-		//initial tile may be 1, 2, 3
-		float total_val = 0.0;
-		int num = 0;
-		for(board::cell i=1;i<4;i++){
-			for(int pos:unoccupied){
-				board tmp = b;
-				tmp.set_tile(pos, i);
-				float best_val = -numeric_limits<float>::max();
-				num++;
+		std::shuffle(bag, bag + num, engine);
+		board::cell tile = b.hint();
+		board::cell hint = bag[--num];
+		//cout<<"HINT: "<<cur_tile<<endl;
+		float value = 0.0;
 
-				for(int j=0;j<4;j++){
-					board tmp_after = tmp;
-					board::reward reward = tmp_after.slide(j);
-					if(reward == -1){
-						continue;
-					}
+		for(int i : empty_tile){
+			board state1 = b;
+			state1.place(i, tile, hint);
+			//state1.set_tile(i, cur_tile);
+			board::reward best_reward1 = -1;
+			float best_value1 = -std::numeric_limits<float>::max();
+			//int best_op = -1;
 
-					float val = get_value(tmp_after);
-					if(reward + val > best_val){
-						best_val = reward + val;
-					}
+			for(int op1 : opcode){
+				board after1 = state1;
+				board::reward reward1 = after1.slide(op1);
+				if(reward1 < 0) continue;
+				
+				float value1 = get_value(after1);
+				if(reward1 + value1 > best_reward1 + best_value1) {
+					best_reward1 = reward1;
+					best_value1 = value1;
 				}
-				total_val += best_val;
 			}
+
+			if(best_reward1 == -1){
+				continue;
+			}		
+			value += (best_value1 + best_reward1) / float(num_empty);
 		}
 
-		return (total_val / num);
+		return value;
 	}
+	
 
 	int encode6(const board& board, int a, int b, int c, int d, int e, int f){
 		return (board(a) << 0) | (board(b) << 4) | (board(c) << 8) | (board(d) << 12) | (board(e) << 16) | (board(f) << 20);
@@ -371,4 +393,5 @@ public:
 private:
 	std::array<int, 4> opcode;
 	int count;
+	std::default_random_engine engine;
 };
