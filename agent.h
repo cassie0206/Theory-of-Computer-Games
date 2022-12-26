@@ -29,6 +29,7 @@ struct state {
 	board after;
 	int reward;
 	float value;
+    bool isSlider = false;
 };
 
 class agent {
@@ -44,7 +45,7 @@ public:
 	virtual ~agent() {}
 	virtual void open_episode(const std::string& flag = "") {}
 	virtual void close_episode(const std::string& flag = "") {}
-	virtual action take_action(const board& b, float& state_value, int& r) { return action(); }
+	virtual action take_action(const board& b, state &s) { return action(); }
 	virtual bool check_for_win(const board& b) { return false; }
 
 public:
@@ -131,7 +132,7 @@ public:
 		spaces[4] = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15 };
 	}
 
-	virtual action take_action(const board& after, float& state_value, int& r) {
+	virtual action take_action(const board& after, state &s) {
 		std::vector<int> space = spaces[after.last()];
 		std::shuffle(space.begin(), space.end(), engine);
 		for (int pos : space) {
@@ -164,7 +165,7 @@ public:
 	random_slider(const std::string& args = "") : random_agent("name=slide role=slider " + args),
 		opcode({ 0, 1, 2, 3 }) {}
 
-	virtual action take_action(const board& before) {
+	virtual action take_action(const board& before, state &s) {
 		std::shuffle(opcode.begin(), opcode.end(), engine);
 		for (int op : opcode) {
 			board::reward reward = board(before).slide(op);
@@ -197,8 +198,10 @@ public:
 			save_weights(meta["save"]);
 	}
 
-	virtual action take_action(const board& before, float& state_value, int& r) {
-		float best_value = -numeric_limits<float>::max();
+	virtual action take_action(const board& before, state &s) 
+    {   
+        s.isSlider = true;
+        float best_value = -numeric_limits<float>::max();
 		float best_cur_val = -numeric_limits<float>::max();
 		int best_reward = -1;
 		int best_op = -1; 
@@ -220,8 +223,10 @@ public:
 		}
 
         if(best_op != -1){
-			state_value = best_cur_val;
-			r = best_reward;
+			//state_value = best_cur_val;
+			//r = best_reward;
+            s.reward = best_reward;
+            s.value = best_cur_val;
 			return action::slide(best_op);
 		}
 		else{
