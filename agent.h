@@ -229,6 +229,10 @@ public:
 		}
 		if (meta.find("load") != meta.end())
 			load_weights(meta["load"]);
+		spaces[0] = {12, 13, 14, 15};										// buttom
+		spaces[1] = {0, 4, 8, 12};											// left
+		spaces[2] = {0, 1, 2, 3};											// up
+		spaces[3] = {3, 7, 11, 15};	
 		cout<<"number of step: "<<step<<"\n";
 		count = 0;
 	}
@@ -292,11 +296,6 @@ public:
 	float expectimax(const board &b, int op){
 		std::vector<int> empty_tile;
 		int num_empty = 0;
-		std::vector<int> spaces[4];
-		spaces[0] = { 12, 13, 14, 15 };
-		spaces[1] = { 0, 4, 8, 12 };
-		spaces[2] = { 0, 1, 2, 3};
-		spaces[3] = { 3, 7, 11, 15 };
 		//std::vector<int> space = spaces[b.last()];
 		std::vector<int> space = spaces[op];
 		//cout<<"EMPTY: ";
@@ -394,4 +393,5 @@ private:
 	std::array<int, 4> opcode;
 	int count;
 	std::default_random_engine engine;
+	std::vector<int> spaces[4];
 };
